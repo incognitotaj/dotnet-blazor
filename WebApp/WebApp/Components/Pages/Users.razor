@@ -1,0 +1,101 @@
+﻿@page "/users"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@using WebApp.Data
+
+@inject NavigationManager Navigation
+@inject UserManager<ApplicationUser> UserManager
+@inject IJSRuntime js
+
+@attribute [Authorize]
+
+<PageTitle>Users</PageTitle>
+
+<h1>Users List</h1>
+
+@if (users == null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (!users.Any())
+{
+    <p>No users found in the database.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var user in users)
+            {
+                <tr>
+                    <td>@user.UserName</td>
+                    <td>@user.Email</td>
+                    <td>
+                        <button class="btn btn-primary" @onclick="() => NavigateToEdit(user.Id)">Edit</button>
+                        <button class="btn btn-danger" @onclick="() => ConfirmDelete(user.Id)">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <p class="text-danger">@errorMessage</p>
+}
+
+@code {
+    private string errorMessage;
+    private List<ApplicationUser>? users = new List<ApplicationUser>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        users = await UserManager.Users.ToListAsync();
+    }
+
+    private void NavigateToEdit(string userId)
+    {
+        Console.WriteLine($"Navigating to edit page for user ID: {userId}"); // Log for verification
+        Navigation.NavigateTo($"/edit-user/{userId}");
+    }
+
+    private async Task ConfirmDelete(string userId)
+    {
+        Console.WriteLine($"Attempting to delete user ID: {userId}"); // Log for verification
+        if (await js.InvokeAsync<bool>("confirm", $"Are you sure you want to delete this user?"))
+        {
+            await DeleteUser(userId);
+        }
+    }
+
+    private async Task DeleteUser(string userId)
+    {
+        var user = await UserManager.FindByIdAsync(userId);
+        if (user != null)
+        {
+            var result = await UserManager.DeleteAsync(user);
+            if (result.Succeeded)
+            {
+                users = await UserManager.Users.ToListAsync();
+                StateHasChanged();
+            }
+            else
+            {
+                errorMessage = "Failed to delete the user.";
+                foreach (var error in result.Errors)
+                {
+                    errorMessage += $" {error.Description}";
+                }
+            }
+        }
+    }
+}
